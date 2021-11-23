@@ -14,38 +14,39 @@ def diff_pixel(P1,P2):
     diff_b = abs(P1[2]-P2[2])
     return diff_r + diff_g + diff_b
 
-def is_canard(Grid,Body, Beak, Outer_Walls_inbox, Outer_Walls_outbox, Special_beak_check,x,y,xmax,ymax):
+def is_canard(Grid,Body, Beak, Outer_Walls_inbox, Outer_Walls_outbox, Special_beak_check,x,y,xmax,ymax,threshold = 0):
     current = Grid[x,y]
 
     #TESTING SPACE
     if not((2<= x < xmax-2) and (0 <= y < ymax-3)):
-        return False
+        return threshold+1
 
     #BEAK
     (b1x,b1y) = Beak[0]
     (b2x,b2y) = Beak[1]
     matching_beak = (0 == diff_pixel( Grid[x+b1x,y+b1y], Grid[x+b2x,y+b2y] ))
     if not matching_beak:
-        return False
+        return threshold+1
 
     #DIFFERENCE beak and body
     matching_beak_and_body = (0 == diff_pixel( Grid[x+b1x,y+b1y], current ))
     if matching_beak_and_body :
-        return False
+        return threshold+1
 
     #BODY
-    matching_body = True
+    artefacts = 0
     for (dx,dy) in Body:
-        matching_body = ( 0 == diff_pixel( current, Grid[x+dx,y+dy] ) )
-        if not matching_body :
-            return False
+        if not ( 0 == diff_pixel( current, Grid[x+dx,y+dy] ) ):
+            artefacts +=1
+        if artefacts > threshold :
+            return threshold+1
     
     #Testing outer walls inbox
     matching_owi = False
     for (dx,dy) in Outer_Walls_inbox:
         matching_owi = ( 0 == diff_pixel( current, Grid[x+dx,y+dy] ) )
         if matching_owi :
-            return False
+            return threshold+1
 
     #Testing outer walls outbox
     matching_owo = False
@@ -53,7 +54,7 @@ def is_canard(Grid,Body, Beak, Outer_Walls_inbox, Outer_Walls_outbox, Special_be
         if 0<=x+dx<xmax and 0<=y+dy<ymax :
             matching_owo = ( 0 == diff_pixel( current, Grid[x+dx,y+dy] ) )
             if matching_owo :
-                return False
+                return threshold+1
 
     #Testing special beak cases 
     matching_spc = False
@@ -61,8 +62,8 @@ def is_canard(Grid,Body, Beak, Outer_Walls_inbox, Outer_Walls_outbox, Special_be
         if 0<=x+dx<xmax and 0<=y+dy<ymax :
             matching_spc = ( 0 == diff_pixel( Grid[x+b1x,y+b1y], Grid[x+dx,y+dy] ) )
             if matching_spc :
-                return False
-    return True
+                return threshold+1
+    return artefacts
 
 def translate(X,Y,r,m):
     if r == 0:
@@ -118,7 +119,7 @@ def load_pattern(file_name,r=0,m=0):
     im_pat.close()
     return body, beak, outer_Walls_inbox, outer_Walls_outbox, special_beak_check
 
-def find_pattern(image_file_name,pattern_files_names,check_symmetry =1,check_rotations=1,output_file =None,output_png_file = None):
+def find_pattern(image_file_name,pattern_files_names,tolerance=0,check_symmetry =1,check_rotations=1,output_file =None,output_png_file = None):
     im = Image.open(image_file_name)
     Grid = im.load()
     xmax = im.size[0]
@@ -128,7 +129,7 @@ def find_pattern(image_file_name,pattern_files_names,check_symmetry =1,check_rot
         img  = im.copy()#Image.new( mode = "RGB", size = (xmax, ymax), color = (230, 230, 230) )
         for x in range (xmax):
             for y in range (ymax):
-                img.putpixel((x, y), (230, 230, 230))
+                img.putpixel((x, y), (200, 200, 200))
     if output_file is not None:
         txt_file = open(output_file,"w") 
 
@@ -147,11 +148,15 @@ def find_pattern(image_file_name,pattern_files_names,check_symmetry =1,check_rot
                 Body, Beak, Outer_Walls_inbox, Outer_Walls_outbox, Special_beak_check = load_pattern(pat_file,r=rot*90,m=mirror)
                 for x in range (xmax):
                     for y in range (ymax):
-                            if is_canard(Grid,Body, Beak, Outer_Walls_inbox, Outer_Walls_outbox, Special_beak_check,x,y,xmax,ymax):
+                            artefacts = is_canard(Grid,Body, Beak, Outer_Walls_inbox, Outer_Walls_outbox, Special_beak_check,x,y,xmax,ymax,threshold =tolerance)
+                            if artefacts<=tolerance:
                                 #canard trouve
                                 nb_coin+=1
                                 if output_file is not None:
-                                    txt_file.write(str(x)+","+str(y)+'\n') 
+                                    if artefacts==0:
+                                        txt_file.write(str(x)+","+str(y)+'\n') 
+                                    else:
+                                        txt_file.write(str(x)+","+str(y)+" artefacts : "+str(artefacts)+'\n') 
                                 if output_png_file is not None:
                                     for (dx,dy) in Body:
                                         img.putpixel((x+dx, y+dy), (0, 0, 0))
@@ -176,7 +181,13 @@ def find_pattern(image_file_name,pattern_files_names,check_symmetry =1,check_rot
 if __name__ == "__main__":
     if len(sys.argv)<3:
         print("USAGE : python canards.py drapeau.png pattern1 <pattern2> ...")
+        print("optionnal : -tolerance=integer")
         sys.exit(0)
+    for arg_id,arg in enumerate(sys.argv):
+        if "-tolerance" in arg:
+            tolerance = int(sys.argv.pop(arg_id).split("=")[1])
+        else:
+            tolerance=0
     im_name = sys.argv[1]
     patterns = sys.argv[2:]
-    find_pattern(im_name,patterns,check_symmetry=1,check_rotations=1,output_file = "canard.txt",output_png_file="canards.png") #"drapeau19-11-21.png"
+    find_pattern(im_name,patterns,tolerance=tolerance,check_symmetry=1,check_rotations=1,output_file = "canard.txt",output_png_file="canards.png") #"drapeau19-11-21.png"
