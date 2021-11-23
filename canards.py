@@ -65,37 +65,21 @@ def is_canard(Grid,Body, Beak, Outer_Walls_inbox, Outer_Walls_outbox, Special_be
                 return threshold+1
     return artefacts
 
-def translate(X,Y,r,m):
-    if r == 0:
-        x = X-3
-        y = Y-1
-    elif r == 90:
-        x = X-1
-        y = Y-3
-    elif r ==180:
-        x = X-3
-        y = Y-5
-    else:
-        x = X-4
-        y = Y-3
-    if m !=0:
-        tmp = x
-        x = y 
-        y = x
-    return x,y
-
-def rotate_symetrize_pixel(x,y,angle,s,centre=(3,3),pat_size=7):
+def rotate_symetrize_pixel(P,angle,s,pat_size=7):
+    centre = (pat_size//2,pat_size//2)
     #Symmetrize
+    x = P[0]
+    y = P[1]
     if s!=0:
         x = -x+pat_size-1
     #change to centre coordinate:
     (xc,yc)=sub_tuple((x,y),centre)
     #Rotation around the centre (origin)
-    if angle==90:
+    if angle==270:
         xc,yc = (-yc,xc)
     if angle==180:
         xc,yc = (-xc,-yc)
-    if angle==270:
+    if angle==90:
         xc,yc = (yc,-xc)
     #back to image coordinates :
     return add_tuple((xc,yc),centre)
@@ -110,14 +94,21 @@ def add_tuple(T1,T2):
     return (T2[0]+T1[0],T2[1]+T1[1])
 
 def load_pattern(file_name,r=0,m=0):
+    #REF PIXEL (head) : (3,1) FOR BASE PATTERN IMAGE
+    ref_pixel = (3,1)
     im_pat = Image.open(file_name)
     if m == 1:
         im_pat = ImageOps.mirror(im_pat)
     im_pat = im_pat.rotate(r)
-    #im_pat.save(str(r)+".png")
+    #im_pat.save(str(r)+".png") #Test save
+    ref_pixel = rotate_symetrize_pixel(ref_pixel,r,m,pat_size=im_pat.size[0])
     Pat = im_pat.load()
     xpmax = im_pat.size[0]
     ypmax = im_pat.size[1]
+    if xpmax != ypmax :
+        print("WARNING : pattern is not a square : might cause crash. Continue ? (Y/n)")
+        if input() == 'n':
+            sys.exit(0)
     body = []
     beak = []
     outer_Walls_inbox = []
@@ -126,7 +117,7 @@ def load_pattern(file_name,r=0,m=0):
     for X in range(xpmax):
         for Y in range(ypmax):
             pixel = Pat[X,Y]
-            x,y = translate(X,Y,r,m)
+            x,y = sub_tuple((X,Y),ref_pixel)
             if (x!= 0 or y !=0) and (pixel != (255,255,255)):
                 if pixel == (255,255,0): # Corps = Jaune
                     body.append((x,y))
@@ -215,5 +206,4 @@ if __name__ == "__main__":
             tolerance=0
     im_name = sys.argv[1]
     patterns = sys.argv[2:]
-    print(rotate_symetrize_pixel(5,2,90,1,centre=(3,3),pat_size=7))
-    #find_pattern(im_name,patterns,tolerance=tolerance,check_symmetry=1,check_rotations=1,output_file = "canard.txt",output_png_file="canards.png") #"drapeau19-11-21.png"
+    find_pattern(im_name,patterns,tolerance=tolerance,check_symmetry=1,check_rotations=1,output_file = "canard.txt",output_png_file="canards.png") #"drapeau19-11-21.png"
