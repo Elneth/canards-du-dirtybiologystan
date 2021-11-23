@@ -84,6 +84,31 @@ def translate(X,Y,r,m):
         y = x
     return x,y
 
+def rotate_symetrize_pixel(x,y,angle,s,centre=(3,3),pat_size=7):
+    #Symmetrize
+    if s!=0:
+        x = -x+pat_size-1
+    #change to centre coordinate:
+    (xc,yc)=sub_tuple((x,y),centre)
+    #Rotation around the centre (origin)
+    if angle==90:
+        xc,yc = (-yc,xc)
+    if angle==180:
+        xc,yc = (-xc,-yc)
+    if angle==270:
+        xc,yc = (yc,-xc)
+    #back to image coordinates :
+    return add_tuple((xc,yc),centre)
+
+def sub_tuple(T2,T1):
+    """
+    T2-T1
+    """
+    return (T2[0]-T1[0],T2[1]-T1[1])
+
+def add_tuple(T1,T2):
+    return (T2[0]+T1[0],T2[1]+T1[1])
+
 def load_pattern(file_name,r=0,m=0):
     im_pat = Image.open(file_name)
     if m == 1:
@@ -190,4 +215,5 @@ if __name__ == "__main__":
             tolerance=0
     im_name = sys.argv[1]
     patterns = sys.argv[2:]
-    find_pattern(im_name,patterns,tolerance=tolerance,check_symmetry=1,check_rotations=1,output_file = "canard.txt",output_png_file="canards.png") #"drapeau19-11-21.png"
+    print(rotate_symetrize_pixel(5,2,90,1,centre=(3,3),pat_size=7))
+    #find_pattern(im_name,patterns,tolerance=tolerance,check_symmetry=1,check_rotations=1,output_file = "canard.txt",output_png_file="canards.png") #"drapeau19-11-21.png"
