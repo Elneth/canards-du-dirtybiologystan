@@ -135,7 +135,7 @@ def load_pattern(file_name,r=0,m=0):
     im_pat.close()
     return body, beak, outer_Walls_inbox, outer_Walls_outbox, special_beak_check
 
-def find_pattern(image_file_name,pattern_files_names,tolerance=0,check_symmetry =1,check_rotations=1,output_file =None,output_png_file = None):
+def find_pattern(image_file_name,pattern_files_names,tolerance=0,check_symmetry =1,check_rotations=1,output_file =None,separate_perfect=True,output_png_file = None):
     im = Image.open(image_file_name)
     Grid = im.load()
     xmax = im.size[0]
@@ -147,9 +147,14 @@ def find_pattern(image_file_name,pattern_files_names,tolerance=0,check_symmetry 
             for y in range (ymax):
                 img.putpixel((x, y), (200, 200, 200))
     if output_file is not None:
-        txt_file = open(output_file,"w") 
+        txt_file = open(output_file,"w")
+        txt_file.write(image_file_name+"\nTolerance : "+str(tolerance)+'\n')
+        if separate_perfect:
+            txt_file_flawed = open(output_file.split(".")[0]+"_flawed."+output_file.split(".")[1],"w") 
+            txt_file_flawed.write(image_file_name+"\nTolerance : "+str(tolerance)+'\n')
 
     nb_total_coin = 0
+    nb_total_coin_flawed = 0
     for i,pat_file in enumerate(pattern_files_names):
         print("Forme",i+1,":",pat_file.split(".")[0])
         for mirror in range(check_symmetry+1):
@@ -159,20 +164,30 @@ def find_pattern(image_file_name,pattern_files_names,tolerance=0,check_symmetry 
                 print("  Avec symetrie")
             for rot in range(check_rotations*3+1):
                 if output_file is not None:
-                    txt_file.write("\n-------\n"+pat_file.split(".")[0]+";symmetry"+str(mirror)+";angle"+str(rot)+'\n') 
+                    txt_file.write('\n'+pat_file+"; symmetry "+str(mirror)+"; angle "+str(rot)+'\n')
+                    if separate_perfect:
+                        txt_file_flawed.write('\n'+pat_file+"; symmetry "+str(mirror)+"; angle "+str(rot)+'\n')
+
                 nb_coin = 0
+                nb_coin_flawed = 0
                 Body, Beak, Outer_Walls_inbox, Outer_Walls_outbox, Special_beak_check = load_pattern(pat_file,r=rot*90,m=mirror)
                 for x in range (xmax):
                     for y in range (ymax):
                             artefacts = is_canard(Grid,Body, Beak, Outer_Walls_inbox, Outer_Walls_outbox, Special_beak_check,x,y,xmax,ymax,threshold =tolerance)
                             if artefacts<=tolerance:
                                 #canard trouve
-                                nb_coin+=1
+                                if artefacts ==0:
+                                    nb_coin+=1
+                                else:
+                                    nb_coin_flawed+=1
                                 if output_file is not None:
                                     if artefacts==0:
-                                        txt_file.write(str(x)+","+str(y)+'\n') 
+                                        txt_file.write("("+str(x)+","+str(y)+")"+'\n') 
                                     else:
-                                        txt_file.write(str(x)+","+str(y)+" artefacts : "+str(artefacts)+'\n') 
+                                        if separate_perfect:
+                                            txt_file_flawed.write("("+str(x)+","+str(y)+"),"+str(artefacts)+" artefacts"+'\n')
+                                        else:
+                                            txt_file.write("("+str(x)+","+str(y)+"),",+str(artefacts)+" artefacts"+'\n')
                                 if output_png_file is not None:
                                     for (dx,dy) in Body:
                                         img.putpixel((x+dx, y+dy), (0, 0, 0))
@@ -181,10 +196,17 @@ def find_pattern(image_file_name,pattern_files_names,tolerance=0,check_symmetry 
                                     img.putpixel((x, y), (0, 0, 0))
                                 
                 print("    Angle",rot*90,":",nb_coin,"canards")
+                print("    Angle",rot*90,":",nb_coin_flawed,"canards avec defaut(s)")
                 nb_total_coin += nb_coin
+                nb_total_coin_flawed += nb_coin_flawed
     print("Nombre total de canards :",nb_total_coin)
+    print("Nombre total de canards avec defaut(s) :",nb_total_coin_flawed)
     if output_file is not None:
         txt_file.write('\n-------\nTOTAL : '+str(nb_total_coin))
+        if separate_perfect:
+            txt_file_flawed.write('\n-------\nTOTAL : '+str(nb_total_coin_flawed))
+        else:
+            txt_file.write(' + '+str(nb_total_coin_flawed)+"flawed")
         txt_file.close()
     if output_png_file is not None:
         diff = ImageChops.subtract(im, img)
@@ -197,7 +219,7 @@ def find_pattern(image_file_name,pattern_files_names,tolerance=0,check_symmetry 
 if __name__ == "__main__":
     if len(sys.argv)<3:
         print("USAGE : python canards.py drapeau.png pattern1 <pattern2> ...")
-        print("optionnal : -tolerance=integer")
+        print("optionnal : -tolerance=integer (recommended : 3")
         sys.exit(0)
     for arg_id,arg in enumerate(sys.argv):
         if "-tolerance" in arg:
